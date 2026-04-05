@@ -1,0 +1,135 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #111;
+  font-family: 'EB Garamond', 'Garamond', 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#page {
+  position: relative;
+  aspect-ratio: 9 / 16;
+  max-height: 100vh;
+  max-height: 100dvh;
+  max-width: 100vw;
+  width: auto;
+  height: 100vh;
+  height: 100dvh;
+  margin: 0 auto;
+  background: #faf8f4;
+  overflow: hidden;
+}
+
+@media (max-aspect-ratio: 9/16) {
+  #page {
+    width: 100vw;
+    height: auto;
+  }
+}
+
+#stage {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+#stage .line {
+  position: absolute;
+  white-space: pre;
+  color: #080808;
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+#stage .title-line {
+  position: absolute;
+  white-space: pre;
+  color: #080808;
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+#stage .epigraph-line {
+  position: absolute;
+  white-space: pre;
+  color: #080808;
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+#stage .attribution-line {
+  position: absolute;
+  white-space: pre;
+  color: #080808;
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+#stage .drop-cap {
+  position: absolute;
+  color: #080808;
+  pointer-events: none;
+}
+
+#video {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  height: auto;
+  z-index: 2;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+#sample-canvas {
+  display: none;
+}
+
+#play-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+#play-overlay.hidden {
+  display: none;
+}
+
+#play-btn {
+  font-family: 'EB Garamond', serif;
+  font-size: 1.4rem;
+  padding: 0.8em 2.4em;
+  border: 1px solid #333;
+  background: #fff;
+  color: #080808;
+  cursor: pointer;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  transition: background 0.2s, color 0.2s;
+}
+
+#play-btn:hover {
+  background: #080808;
+  color: #fff;
+}
