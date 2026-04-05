@@ -508,6 +508,11 @@ let recordedChunks: Blob[] = []
 let isRecording = false
 
 const recordBtn = document.getElementById('record-btn') as HTMLButtonElement
+const recordingIndicator = document.createElement('div')
+recordingIndicator.id = 'recording-indicator'
+recordingIndicator.textContent = 'REC'
+recordingIndicator.style.cssText = 'position:fixed;top:16px;right:16px;z-index:200;background:rgba(200,0,0,0.85);color:#fff;font-family:sans-serif;font-size:12px;font-weight:700;padding:4px 10px;border-radius:4px;display:none;letter-spacing:0.05em;'
+document.body.appendChild(recordingIndicator)
 
 function drawRecordingFrame() {
   const pageRect = getPageRect()
@@ -639,7 +644,7 @@ function startRecording() {
 
   mediaRecorder.start()
   isRecording = true
-  recordBtn.classList.add('recording')
+  recordingIndicator.style.display = 'block'
 }
 
 function stopRecording() {
@@ -647,7 +652,7 @@ function stopRecording() {
     mediaRecorder.stop()
   }
   isRecording = false
-  recordBtn.classList.remove('recording')
+  recordingIndicator.style.display = 'none'
 }
 
 // --- Animation loop ---
@@ -680,29 +685,28 @@ async function init() {
 
   playBtn.addEventListener('click', () => {
     playOverlay.classList.add('hidden')
-    recordBtn.classList.remove('hidden')
     video.play()
     startAnimation()
   })
 
-  recordBtn.addEventListener('click', (e) => {
-    e.stopPropagation()
-    if (isRecording) {
-      stopRecording()
-    } else {
-      if (video.paused) {
-        video.currentTime = 0
-        video.play()
-        startAnimation()
-      }
-      startRecording()
-    }
+  recordBtn.addEventListener('click', () => {
+    playOverlay.classList.add('hidden')
+    video.currentTime = 0
+    video.play()
+    startAnimation()
+    startRecording()
   })
 
   video.addEventListener('ended', () => {
-    if (isRecording) stopRecording()
-    video.currentTime = 0
-    video.play()
+    if (isRecording) {
+      stopRecording()
+      video.pause()
+      stopAnimation()
+      render()
+    } else {
+      video.currentTime = 0
+      video.play()
+    }
   })
 
   video.addEventListener('pause', () => {
@@ -716,7 +720,7 @@ async function init() {
   })
 
   page.addEventListener('click', (e) => {
-    if (e.target === playBtn || e.target === recordBtn || recordBtn.contains(e.target as Node)) return
+    if (e.target === playBtn || e.target === recordBtn) return
     if (playOverlay.classList.contains('hidden')) {
       if (video.paused) {
         video.play()
