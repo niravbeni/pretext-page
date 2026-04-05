@@ -604,15 +604,30 @@ function drawRecordingFrame() {
   ctx.restore()
 }
 
+let audioCtx: AudioContext | null = null
+let audioSource: MediaElementAudioSourceNode | null = null
+let audioDest: MediaStreamAudioDestinationNode | null = null
+
+function ensureAudioCapture() {
+  if (audioCtx) return
+  audioCtx = new AudioContext()
+  audioSource = audioCtx.createMediaElementSource(video)
+  audioDest = audioCtx.createMediaStreamDestination()
+  audioSource.connect(audioDest)
+  audioSource.connect(audioCtx.destination)
+}
+
 function startRecording() {
   recordedChunks = []
 
-  const videoStream = video.captureStream ? video.captureStream() : null
-  const audioTracks = videoStream ? videoStream.getAudioTracks() : []
+  ensureAudioCapture()
+
   const canvasStream = recCanvas.captureStream(30)
 
-  if (audioTracks.length > 0) {
-    canvasStream.addTrack(audioTracks[0]!)
+  if (audioDest) {
+    for (const track of audioDest.stream.getAudioTracks()) {
+      canvasStream.addTrack(track)
+    }
   }
 
   const mimeType = MediaRecorder.isTypeSupported('video/mp4;codecs=avc1')
