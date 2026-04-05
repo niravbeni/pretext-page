@@ -494,6 +494,162 @@ function render() {
   }
 }
 
+// --- Recording ---
+
+const REC_W = 1080
+const REC_H = 1920
+const recCanvas = document.createElement('canvas')
+recCanvas.width = REC_W
+recCanvas.height = REC_H
+const recCtx = recCanvas.getContext('2d')!
+
+let mediaRecorder: MediaRecorder | null = null
+let recordedChunks: Blob[] = []
+let isRecording = false
+
+const recordBtn = document.getElementById('record-btn') as HTMLButtonElement
+
+function drawRecordingFrame() {
+  const pageRect = getPageRect()
+  const sx = REC_W / pageRect.width
+  const sy = REC_H / pageRect.height
+
+  const ctx = recCtx
+  ctx.save()
+
+  ctx.fillStyle = '#faf8f4'
+  ctx.fillRect(0, 0, REC_W, REC_H)
+
+  const s = getScaledSizes(pageRect.width, pageRect.height)
+  const lsPx = s.titleLetterSpacing * s.titleSize
+
+  ctx.scale(sx, sy)
+  ctx.fillStyle = '#080808'
+
+  const titleFont = `500 ${s.titleSize}px ${BODY_FONT_FAMILY}`
+  const epigraphFont = `${s.epigraphSize}px ${BODY_FONT_FAMILY}`
+  const bodyFont = `${s.bodySize}px ${BODY_FONT_FAMILY}`
+
+  // Title
+  for (const el of titleLinePool) {
+    if (el.style.display === 'none') continue
+    ctx.font = titleFont
+    ctx.textBaseline = 'top'
+    const y = parseFloat(el.style.top)
+    const text = el.textContent || ''
+    const textW = ctx.measureText(text).width + (text.length - 1) * lsPx
+    const x = (pageRect.width - textW) / 2
+
+    let cx = x
+    for (let ci = 0; ci < text.length; ci++) {
+      ctx.fillText(text[ci]!, cx, y)
+      cx += ctx.measureText(text[ci]!).width + lsPx
+    }
+  }
+
+  // Epigraph
+  ctx.font = epigraphFont
+  for (const el of epigraphLinePool) {
+    if (el.style.display === 'none') continue
+    ctx.fillText(el.textContent || '', parseFloat(el.style.left), parseFloat(el.style.top))
+  }
+
+  // Attribution
+  for (const el of attrLinePool) {
+    if (el.style.display === 'none') continue
+    ctx.font = epigraphFont
+    ctx.fillText(el.textContent || '', parseFloat(el.style.left), parseFloat(el.style.top))
+  }
+
+  // Drop cap
+  if (dropCapEl) {
+    ctx.font = `${s.dropCapSize}px ${BODY_FONT_FAMILY}`
+    ctx.fillText(dropCapEl.textContent || '', parseFloat(dropCapEl.style.left), parseFloat(dropCapEl.style.top))
+  }
+
+  // Body lines with justification
+  ctx.font = bodyFont
+  for (const el of bodyLinePool) {
+    if (el.style.display === 'none') continue
+    const text = el.textContent || ''
+    const x = parseFloat(el.style.left)
+    const y = parseFloat(el.style.top)
+    const ws = parseFloat(el.style.wordSpacing) || 0
+
+    if (ws > 0) {
+      const words = text.split(' ')
+      let cx = x
+      for (let wi = 0; wi < words.length; wi++) {
+        ctx.fillText(words[wi]!, cx, y)
+        cx += ctx.measureText(words[wi]!).width + ctx.measureText(' ').width + ws
+      }
+    } else {
+      ctx.fillText(text, x, y)
+    }
+  }
+
+  // Video with multiply blend
+  ctx.globalCompositeOperation = 'multiply'
+  const videoRect = getVideoRect(pageRect)
+  if (video.videoWidth && !video.paused) {
+    ctx.drawImage(video, videoRect.x, videoRect.y, videoRect.w, videoRect.h)
+  }
+  ctx.globalCompositeOperation = 'source-over'
+
+  ctx.restore()
+}
+
+function startRecording() {
+  recordedChunks = []
+
+  const videoStream = video.captureStream ? video.captureStream() : null
+  const audioTracks = videoStream ? videoStream.getAudioTracks() : []
+  const canvasStream = recCanvas.captureStream(30)
+
+  if (audioTracks.length > 0) {
+    canvasStream.addTrack(audioTracks[0]!)
+  }
+
+  const mimeType = MediaRecorder.isTypeSupported('video/mp4;codecs=avc1')
+    ? 'video/mp4;codecs=avc1'
+    : MediaRecorder.isTypeSupported('video/webm;codecs=h264')
+      ? 'video/webm;codecs=h264'
+      : 'video/webm;codecs=vp8'
+
+  mediaRecorder = new MediaRecorder(canvasStream, {
+    mimeType,
+    videoBitsPerSecond: 8_000_000,
+  })
+
+  mediaRecorder.ondataavailable = (e) => {
+    if (e.data.size > 0) recordedChunks.push(e.data)
+  }
+
+  mediaRecorder.onstop = () => {
+    const ext = mimeType.startsWith('video/mp4') ? 'mp4' : 'webm'
+    const blob = new Blob(recordedChunks, { type: mimeType })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `simulacra-recording.${ext}`
+    a.click()
+    URL.revokeObjectURL(url)
+    recordedChunks = []
+  }
+
+  mediaRecorder.start()
+  isRecording = true
+  recordBtn.classList.add('recording')
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop()
+  }
+  isRecording = false
+  recordBtn.classList.remove('recording')
+}
+
 // --- Animation loop ---
 
 let animating = false
@@ -501,6 +657,7 @@ let animating = false
 function tick() {
   if (!animating) return
   render()
+  if (isRecording) drawRecordingFrame()
   requestAnimationFrame(tick)
 }
 
@@ -523,11 +680,27 @@ async function init() {
 
   playBtn.addEventListener('click', () => {
     playOverlay.classList.add('hidden')
+    recordBtn.classList.remove('hidden')
     video.play()
     startAnimation()
   })
 
+  recordBtn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    if (isRecording) {
+      stopRecording()
+    } else {
+      if (video.paused) {
+        video.currentTime = 0
+        video.play()
+        startAnimation()
+      }
+      startRecording()
+    }
+  })
+
   video.addEventListener('ended', () => {
+    if (isRecording) stopRecording()
     video.currentTime = 0
     video.play()
   })
@@ -543,7 +716,7 @@ async function init() {
   })
 
   page.addEventListener('click', (e) => {
-    if (e.target === playBtn) return
+    if (e.target === playBtn || e.target === recordBtn || recordBtn.contains(e.target as Node)) return
     if (playOverlay.classList.contains('hidden')) {
       if (video.paused) {
         video.play()
